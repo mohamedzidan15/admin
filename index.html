@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة تحكم قرآنك - Firebase</title>
+    <script type="module">
+        // استيراد مكتبات Firebase
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // إعدادات Firebase الخاصة بك
+        const firebaseConfig = {
+            apiKey: "AIzaSyBsRLvY6fvU_rsfvLJgAh4D4eGuBmkNz8Q",
+            authDomain: "quranak-app-54607.firebaseapp.com",
+            projectId: "quranak-app-54607",
+            storageBucket: "quranak-app-54607.firebasestorage.app",
+            messagingSenderId: "945491695942",
+            appId: "1:945491695942:web:e4aaf1f26e7e0178576d47",
+            measurementId: "G-8RH46ME7B3"
+        };
+
+        // تهيئة Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // ربط الدوال بالـ Window عشان HTML يقدر يشوفها
+        window.db = db;
+        window.collection = collection;
+        window.addDoc = addDoc;
+        window.getDocs = getDocs;
+        window.deleteDoc = deleteDoc;
+        window.doc = doc;
+        window.query = query;
+        window.orderBy = orderBy;
+        window.serverTimestamp = serverTimestamp;
+
+        // تشغيل الكود بعد ما الصفحة تحمل
+        document.addEventListener('DOMContentLoaded', () => {
+            loadVideos();
+            
+            document.getElementById('videoForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const title = document.getElementById('title').value;
+                const url = document.getElementById('url').value;
+                const thumb = document.getElementById('thumb').value;
+                const reciter = document.getElementById('reciter').value;
+                const btn = document.getElementById('submitBtn');
+                
+                btn.textContent = 'جاري الإضافة...';
+                btn.disabled = true;
+
+                try {
+                    await addDoc(collection(db, "videos"), {
+                        title: title,
+                        video_url: url,
+                        thumbnail: thumb,
+                        reciter_name: reciter,
+                        createdAt: serverTimestamp()
+                    });
+                    document.getElementById('videoForm').reset();
+                    showToast('تم إضافة الفيديو بنجاح!', false);
+                    loadVideos();
+                } catch (error) {
+                    showToast('حدث خطأ: ' + error.message, true);
+                } finally {
+                    btn.textContent = 'إضافة الفيديو';
+                    btn.disabled = false;
+                }
+            });
+        });
+
+        async function loadVideos() {
+            const list = document.getElementById('videosList');
+            list.innerHTML = 'جاري التحميل...';
+            try {
+                const q = query(collection(db, "videos"), orderBy("createdAt", "desc"));
+                const querySnapshot = await getDocs(q);
+                list.innerHTML = '';
+                
+                if (querySnapshot.empty) {
+                    list.innerHTML = '<p style="text-align:center; color:#aaa;">لا توجد فيديوهات حالياً.</p>';
+                    return;
+                }
+
+                querySnapshot.forEach((docSnap) => {
+                    const v = docSnap.data();
+                    list.innerHTML += `
+                        <div class="list-item">
+                            <div>
+                                <strong style="color:#c9a959;">${v.title}</strong><br>
+                                <small style="color:#aaa;">${v.reciter_name || 'غير معروف'}</small>
+                            </div>
+                            <button class="btn-delete" onclick="deleteVideo('${docSnap.id}')">حذف</button>
+                        </div>
+                    `;
+                });
+            } catch (error) {
+                list.innerHTML = '<p style="color:red;">خطأ في جلب البيانات. تأكد من إعدادات Firestore.</p>';
+            }
+        }
+
+        window.deleteVideo = async (id) => {
+            if(!confirm('هل أنت متأكد من الحذف؟')) return;
+            try {
+                await deleteDoc(doc(db, "videos", id));
+                showToast('تم الحذف', false);
+                loadVideos();
+            } catch (error) {
+                showToast('خطأ في الحذف', true);
+            }
+        }
+
+        function showToast(msg, isError) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.style.background = isError ? '#ff4757' : '#2ed573';
+            t.style.color = isError ? '#fff' : '#000';
+            t.style.display = 'block';
+            setTimeout(() => t.style.display = 'none', 3000);
+        }
+    </script>
+    <style>
+        body { font-family: sans-serif; background: #0a0f1e; color: #fff; margin: 0; padding: 20px; }
+        .header { background: #1a4755; padding: 15px; border-radius: 10px; border: 1px solid #c9a959; margin-bottom: 20px; text-align: center;}
+        .header h1 { margin: 0; color: #c9a959; font-size: 22px; }
+        .grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+        @media (min-width: 768px) { .grid { grid-template-columns: 1fr 1fr; } }
+        .card { background: #1a4755; padding: 20px; border-radius: 10px; border: 1px solid rgba(201,169,89,0.3); }
+        .card h3 { color: #c9a959; margin-top: 0; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; }
+        input { width: 100%; padding: 12px; margin: 8px 0 15px 0; border-radius: 5px; border: none; box-sizing: border-box; font-size: 14px; }
+        button.submit { background: #c9a959; color: #000; border: none; padding: 12px; border-radius: 5px; font-weight: bold; cursor: pointer; width: 100%; font-size: 16px; }
+        .list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .btn-delete { background: transparent; color: #ff4757; border: 1px solid #ff4757; padding: 5px 10px; border-radius: 5px; cursor: pointer; }
+        #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #2ed573; color: #000; padding: 10px 20px; border-radius: 20px; display: none; font-weight: bold; z-index: 9999;}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>لوحة تحكم قرآنك</h1>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <h3>إضافة فيديو جديد</h3>
+            <form id="videoForm">
+                <input type="text" id="title" placeholder="عنوان الفيديو" required>
+                <input type="url" id="url" placeholder="رابط الفيديو (mp4)" required>
+                <input type="url" id="thumb" placeholder="رابط الصورة (اختياري)">
+                <input type="text" id="reciter" placeholder="اسم القارئ" required>
+                <button type="submit" class="submit" id="submitBtn">إضافة الفيديو</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h3>الفيديوهات الحالية</h3>
+            <div id="videosList" style="max-height: 400px; overflow-y: auto;">جاري التحميل...</div>
+        </div>
+    </div>
+
+    <div id="toast">تم بنجاح!</div>
+</body>
+</html>
